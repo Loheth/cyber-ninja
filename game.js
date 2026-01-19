@@ -175,10 +175,24 @@ async function loadAssets() {
 
 // Generate random fruit
 function generateRandomFruit(fruit) {
-    // All fruits and bomb are now larger (100x100)
-    // Orange gets a larger size to compensate for transparent padding in its image
-    // Pomegranate gets a smaller size to match visual size of other fruits
-    const size = fruit === 'orange' ? 120 : (fruit === 'pomegranate' ? 90 : 100);
+    // Randomize size for all fruits
+    // Base sizes: orange (120), pomegranate (90), others (100)
+    // Add random variation: ±30% of base size
+    let baseSize;
+    if (fruit === 'orange') {
+        baseSize = 120;
+    } else if (fruit === 'pomegranate') {
+        baseSize = 90;
+    } else {
+        baseSize = 100;
+    }
+    
+    // Randomize size between 70% and 130% of base size
+    const sizeVariation = 0.3; // 30% variation
+    const minSize = baseSize * (1 - sizeVariation);
+    const maxSize = baseSize * (1 + sizeVariation);
+    const size = Math.floor(Math.random() * (maxSize - minSize + 1) + minSize);
+    
     fruitData[fruit] = {
         x: Math.random() * (WIDTH - size) + size / 2,
         y: HEIGHT, // Start at bottom of screen
