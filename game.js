@@ -140,7 +140,7 @@ async function loadAssets() {
         // Summer gameplay background (cyber-tropical image)
         // Replace 'summer.png' with your cyber-tropical image filename when you add it
         console.log('Loading summer background...');
-        assets.summerBg = await loadImage('summer.png'); // TODO: Replace with your cyber-tropical image
+        assets.summerBg = await loadImage('summer.jpg'); // TODO: Replace with your cyber-tropical image
         console.log('Summer background loaded successfully');
         
         console.log('Loading winter background...');
