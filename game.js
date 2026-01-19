@@ -1548,9 +1548,20 @@ document.addEventListener('keydown', (e) => {
         heartPopAnimations = [];
         initializeFruits();
     } else if (e.key === 'Enter' && gameState === 'leaderboard') {
-        gameState = 'menu';
-        playerName = "";
+        // Start new game directly from leaderboard
+        gameState = 'playing';
+        gameOver = false;
+        playerLives = 3;
         score = 0;
+        fruitSpawnRate = 0.2;
+        bombFrequency = 0.1;
+        currentDifficulty = "Easy";
+        startTime = Date.now();
+        currentTime = 0;
+        mouseTrail = [];
+        heartPopAnimations = [];
+        playerName = "";
+        initializeFruits();
     }
 });
 
@@ -1671,9 +1682,20 @@ function handleClick(x, y) {
         addToLeaderboard(playerName, score);
         gameState = 'leaderboard';
     } else if (gameState === 'leaderboard') {
-        gameState = 'menu';
-        playerName = "";
+        // Start new game directly from leaderboard
+        gameState = 'playing';
+        gameOver = false;
+        playerLives = 3;
         score = 0;
+        fruitSpawnRate = 0.2;
+        bombFrequency = 0.1;
+        currentDifficulty = "Easy";
+        startTime = Date.now();
+        currentTime = 0;
+        mouseTrail = [];
+        heartPopAnimations = [];
+        playerName = "";
+        initializeFruits();
     } else if (gameState === 'gameover') {
         gameState = 'menu';
     }
