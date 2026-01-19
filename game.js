@@ -38,7 +38,7 @@ let currentNameInput = "";
 let leaderboard = [];
 
 // Fruits array
-const fruits = ['melon', 'orange', 'pomegranate', 'guava', 'bomb'];
+const fruits = ['melon', 'orange', 'pomegranate', 'guava', 'bomb', 'bomb1'];
 
 // Fruit facts
 const fruitFacts = [
@@ -83,10 +83,6 @@ const assets = {
     winterBg: null,
     fruits: {},
     halfFruits: {},
-    lives: {
-        white: null,
-        red: null
-    },
     explosion: null,
     gameOver: null
 };
@@ -156,17 +152,13 @@ async function loadAssets() {
         // Load fruit images
         for (const fruit of fruits) {
             assets.fruits[fruit] = await loadImage(`images/${fruit}.png`);
-            if (fruit !== 'bomb') {
+            if (fruit !== 'bomb' && fruit !== 'bomb1') {
                 assets.halfFruits[fruit] = await loadImage(`images/half_${fruit}.png`);
             }
         }
         
         // Load explosion
         assets.explosion = await loadImage('images/explosion.png');
-        
-        // Load lives
-        assets.lives.white = await loadImage('images/white_lives.png');
-        assets.lives.red = await loadImage('images/red_lives.png');
         
         // Load game over
         assets.gameOver = await loadImage('images/game_over.png');
@@ -183,15 +175,20 @@ async function loadAssets() {
 
 // Generate random fruit
 function generateRandomFruit(fruit) {
+    // All fruits and bomb are now larger (100x100)
+    // Orange gets a larger size to compensate for transparent padding in its image
+    // Pomegranate gets a smaller size to match visual size of other fruits
+    const size = fruit === 'orange' ? 120 : (fruit === 'pomegranate' ? 90 : 100);
     fruitData[fruit] = {
-        x: Math.random() * (WIDTH - 100) + 50,
+        x: Math.random() * (WIDTH - size) + size / 2,
         y: HEIGHT, // Start at bottom of screen
         speedX: (Math.random() * 2 - 1), // Horizontal movement: -1 to 1 (scaled for 60 FPS)
         speedY: -(Math.random() * 6 + 8), // Upward speed: -8 to -14 (higher bounce)
         throw: Math.random() >= 0.25,
         t: 0,
         hit: false,
-        img: assets.fruits[fruit]
+        img: assets.fruits[fruit],
+        size: size
     };
 }
 
@@ -1404,21 +1401,23 @@ const MAX_TRAIL_LENGTH = 5;
 
 // Check collision with trail
 function checkCollision(x, y, fruit) {
-    const size = 60;
+    const size = fruit.size || 60;
     return x > fruit.x && x < fruit.x + size && y > fruit.y && y < fruit.y + size;
 }
 
 function checkTrailCollision(fruit) {
+    const size = fruit.size || 60;
+    const radius = size / 2;
     for (let i = 0; i < mouseTrail.length - 1; i++) {
         const p1 = mouseTrail[i];
         const p2 = mouseTrail[i + 1];
         
         // Check if fruit center is near the line segment
-        const fruitCenterX = fruit.x + 30;
-        const fruitCenterY = fruit.y + 30;
+        const fruitCenterX = fruit.x + radius;
+        const fruitCenterY = fruit.y + radius;
         
         const dist = distanceToLineSegment(fruitCenterX, fruitCenterY, p1.x, p1.y, p2.x, p2.y);
-        if (dist < 30) {
+        if (dist < radius) {
             return true;
         }
     }
@@ -1643,7 +1642,7 @@ function handleClick(x, y) {
                 }
                 
                 if (hit) {
-                    if (key === 'bomb') {
+                    if (key === 'bomb' || key === 'bomb1') {
                         // Trigger heart pop animation for the lost life
                         const heartIndex = playerLives - 1; // Index of the heart that will be lost
                         if (heartIndex >= 0 && heartIndex < 3) {
@@ -1801,17 +1800,18 @@ function gameLoop() {
                 value.y += value.speedY;
                 
                 // Draw fruit if it's on screen
-                if (value.y > -60 && value.y < HEIGHT + 60 && value.x > -60 && value.x < WIDTH + 60) {
-                    ctx.drawImage(value.img, value.x, value.y, 60, 60);
+                const fruitSize = value.size || 60;
+                if (value.y > -fruitSize && value.y < HEIGHT + fruitSize && value.x > -fruitSize && value.x < WIDTH + fruitSize) {
+                    ctx.drawImage(value.img, value.x, value.y, fruitSize, fruitSize);
                 }
                 
                 // Reset fruit if it goes below the screen or too far off screen
-                if (value.y > HEIGHT + 60 || value.x < -100 || value.x > WIDTH + 100) {
+                if (value.y > HEIGHT + fruitSize || value.x < -100 || value.x > WIDTH + 100) {
                     generateRandomFruit(key);
                 }
             } else {
                 // Randomly spawn fruits based on spawn rate (adjusted for 60 FPS)
-                if (key === 'bomb') {
+                if (key === 'bomb' || key === 'bomb1') {
                     if (Math.random() < bombFrequency / 6) {
                         value.throw = true;
                     }
