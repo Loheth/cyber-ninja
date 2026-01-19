@@ -11,6 +11,11 @@ function resizeCanvas() {
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
     factScrollX = WIDTH / 1.6;
+    // Reset theme buttons so they're recalculated with new dimensions
+    if (gameState === 'theme') {
+        themeButtons.summerButton = null;
+        themeButtons.winterButton = null;
+    }
 }
 
 // Game State
@@ -72,7 +77,6 @@ const assets = {
     themeSelectionBg: null, // Background for theme selection screen
     summerBg: null, // Background for summer gameplay
     winterBg: null,
-    professor: null,
     fruits: {},
     halfFruits: {},
     lives: {
@@ -98,8 +102,19 @@ let mouseX = 0;
 let mouseY = 0;
 let mouseDown = false;
 
+// Cybersecurity effects
+let glitchOffset = 0;
+let glitchTimer = 0;
+let scanlineOffset = 0;
+
 // Game state
 let gameState = 'loading'; // 'loading', 'theme', 'menu', 'playing', 'gameover'
+
+// Theme button positions (stored globally for consistent click detection)
+let themeButtons = {
+    summerButton: null,
+    winterButton: null
+};
 
 // Load all images
 function loadImage(src) {
@@ -133,11 +148,6 @@ async function loadAssets() {
         console.log('Winter background loaded successfully');
         
         assets.background = assets.themeSelectionBg; // Use theme selection bg initially
-        
-        // Load professor
-        console.log('Loading professor image...');
-        assets.professor = await loadImage('professor.png');
-        console.log('Professor image loaded successfully');
         
         // Load fruit images
         for (const fruit of fruits) {
@@ -197,6 +207,515 @@ function drawText(text, size, x, y, color = WHITE, align = 'center') {
     ctx.fillText(text, x, y);
 }
 
+// Draw styled text with shadow and gradient effect
+function drawStyledText(text, size, x, y, color = WHITE, align = 'center', shadowColor = 'rgba(0, 0, 0, 0.8)') {
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${size}px Arial`;
+    
+    // Measure text width for proper gradient positioning
+    const textWidth = ctx.measureText(text).width;
+    const gradientStartX = align === 'center' ? x - textWidth / 2 : (align === 'right' ? x - textWidth : x);
+    const gradientEndX = gradientStartX + textWidth;
+    
+    // Draw shadow (multiple layers for depth)
+    ctx.fillStyle = shadowColor;
+    ctx.fillText(text, x + 3, y + 3);
+    ctx.fillText(text, x + 2, y + 2);
+    ctx.fillText(text, x + 1, y + 1);
+    
+    // Draw main text with gradient effect
+    const gradient = ctx.createLinearGradient(gradientStartX, y - size/2, gradientEndX, y + size/2);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.5, lightenColor(color, 0.3));
+    gradient.addColorStop(1, color);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillText(text, x, y);
+}
+
+// Helper function to lighten a color
+function lightenColor(color, amount) {
+    if (color.startsWith('#')) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const r = Math.min(255, (num >> 16) + (255 * amount));
+        const g = Math.min(255, ((num >> 8) & 0x00FF) + (255 * amount));
+        const b = Math.min(255, (num & 0x0000FF) + (255 * amount));
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    return color;
+}
+
+// Draw rounded rectangle helper
+function drawRoundedRect(x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
+// Draw rounded rectangle with angular indentations (futuristic style)
+function drawFuturisticButton(x, y, width, height, radius, indentSize = 15) {
+    ctx.beginPath();
+    // Top-left corner
+    ctx.moveTo(x + radius, y);
+    // Top edge with indentations
+    ctx.lineTo(x + width * 0.25 - indentSize / 2, y);
+    ctx.lineTo(x + width * 0.25, y + indentSize);
+    ctx.lineTo(x + width * 0.25 + indentSize / 2, y);
+    ctx.lineTo(x + width * 0.75 - indentSize / 2, y);
+    ctx.lineTo(x + width * 0.75, y + indentSize);
+    ctx.lineTo(x + width * 0.75 + indentSize / 2, y);
+    ctx.lineTo(x + width - radius, y);
+    // Top-right corner
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    // Right edge
+    ctx.lineTo(x + width, y + height - radius);
+    // Bottom-right corner
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    // Bottom edge with indentations
+    ctx.lineTo(x + width * 0.75 + indentSize / 2, y + height);
+    ctx.lineTo(x + width * 0.75, y + height - indentSize);
+    ctx.lineTo(x + width * 0.75 - indentSize / 2, y + height);
+    ctx.lineTo(x + width * 0.25 + indentSize / 2, y + height);
+    ctx.lineTo(x + width * 0.25, y + height - indentSize);
+    ctx.lineTo(x + width * 0.25 - indentSize / 2, y + height);
+    ctx.lineTo(x + radius, y + height);
+    // Bottom-left corner
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    // Left edge
+    ctx.lineTo(x, y + radius);
+    // Top-left corner
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
+// Draw palm tree icon
+function drawPalmTreeIcon(x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 40, size / 40);
+    
+    // Trunk
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(15, 20, 10, 20);
+    
+    // Leaves
+    ctx.strokeStyle = '#228B22';
+    ctx.fillStyle = '#228B22';
+    ctx.lineWidth = 2;
+    
+    // Left leaf
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.lineTo(5, 5);
+    ctx.lineTo(8, 8);
+    ctx.lineTo(20, 15);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Right leaf
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.lineTo(35, 5);
+    ctx.lineTo(32, 8);
+    ctx.lineTo(20, 15);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Top leaf
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.lineTo(20, 0);
+    ctx.lineTo(18, 5);
+    ctx.lineTo(20, 10);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Ground patch
+    ctx.fillStyle = '#654321';
+    ctx.beginPath();
+    ctx.arc(20, 40, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Draw sun icon
+function drawSunIcon(x, y, size, color = '#FFD700') {
+    ctx.save();
+    ctx.translate(x, y);
+    
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    
+    // Sun circle
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Rays
+    const rayLength = size * 0.2;
+    const rayCount = 8;
+    for (let i = 0; i < rayCount; i++) {
+        const angle = (Math.PI * 2 * i) / rayCount;
+        ctx.beginPath();
+        ctx.moveTo(
+            Math.cos(angle) * size * 0.3,
+            Math.sin(angle) * size * 0.3
+        );
+        ctx.lineTo(
+            Math.cos(angle) * (size * 0.3 + rayLength),
+            Math.sin(angle) * (size * 0.3 + rayLength)
+        );
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+}
+
+// Draw snowflake icon
+function drawSnowflakeIcon(x, y, size, color = '#FFFFFF') {
+    ctx.save();
+    ctx.translate(x, y);
+    
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    
+    const armLength = size * 0.25;
+    const armCount = 6;
+    
+    for (let i = 0; i < armCount; i++) {
+        const angle = (Math.PI * 2 * i) / armCount;
+        ctx.save();
+        ctx.rotate(angle);
+        
+        // Main arm
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, armLength);
+        ctx.stroke();
+        
+        // Side branches
+        ctx.beginPath();
+        ctx.moveTo(0, armLength * 0.4);
+        ctx.lineTo(-armLength * 0.3, armLength * 0.5);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, armLength * 0.4);
+        ctx.lineTo(armLength * 0.3, armLength * 0.5);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+    // Center circle
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Draw mountains icon
+function drawMountainsIcon(x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    
+    ctx.fillStyle = '#E0E0E0';
+    ctx.strokeStyle = '#B0B0B0';
+    ctx.lineWidth = 1.5;
+    
+    // Left mountain
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.3, size * 0.2);
+    ctx.lineTo(-size * 0.15, -size * 0.1);
+    ctx.lineTo(0, size * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Right mountain
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.1);
+    ctx.lineTo(size * 0.15, -size * 0.15);
+    ctx.lineTo(size * 0.3, size * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Snow caps
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.15, -size * 0.1);
+    ctx.lineTo(-size * 0.1, -size * 0.05);
+    ctx.lineTo(-size * 0.05, -size * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.moveTo(size * 0.15, -size * 0.15);
+    ctx.lineTo(size * 0.1, -size * 0.1);
+    ctx.lineTo(size * 0.05, -size * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Check if mouse is hovering over a button
+function isHovering(button, centerX) {
+    // Account for potential scaling (hover area slightly larger for better UX)
+    const hoverPadding = 5;
+    return mouseX >= button.x - hoverPadding && mouseX <= button.x + button.width + hoverPadding &&
+           mouseY >= button.y - hoverPadding && mouseY <= button.y + button.height + hoverPadding;
+}
+
+// Draw cyber grid pattern
+function drawCyberGrid(x, y, width, height, gridSize = 20) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    
+    // Vertical lines
+    for (let i = 0; i <= width; i += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x + i, y);
+        ctx.lineTo(x + i, y + height);
+        ctx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let i = 0; i <= height; i += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + i);
+        ctx.lineTo(x + width, y + i);
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+}
+
+// Draw scanline effect
+function drawScanlines(x, y, width, height) {
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i < height; i += 3) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + i);
+        ctx.lineTo(x + width, y + i);
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+}
+
+// Draw glitch effect
+function drawGlitchText(text, x, y, color, fontSize, isHover) {
+    if (!isHover) {
+        // Normal text
+        ctx.fillStyle = color;
+        ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y);
+        return;
+    }
+    
+    // Glitch effect on hover
+    const glitchIntensity = Math.sin(glitchTimer * 0.3) * 3;
+    const colorShift = Math.random() > 0.7;
+    
+    // Red/cyan glitch effect
+    if (colorShift) {
+        ctx.fillStyle = '#FF0040';
+        ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x - glitchIntensity, y);
+        
+        ctx.fillStyle = '#00FFFF';
+        ctx.fillText(text, x + glitchIntensity, y);
+    }
+    
+    // Main text with slight offset
+    ctx.fillStyle = color;
+    ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+}
+
+// Draw binary code pattern
+function drawBinaryPattern(x, y, width, height) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    
+    const binaryChars = ['0', '1'];
+    const charsPerLine = Math.floor(width / 8);
+    const lines = Math.floor(height / 12);
+    
+    for (let i = 0; i < lines; i++) {
+        let binaryLine = '';
+        for (let j = 0; j < charsPerLine; j++) {
+            binaryLine += binaryChars[Math.floor(Math.random() * 2)];
+        }
+        ctx.fillText(binaryLine, x, y + i * 12);
+    }
+    
+    ctx.restore();
+}
+
+// Draw button matching the design from background.png
+function drawThemeButton(button, text, centerX, isSummer, radius) {
+    const isHover = isHovering(button, centerX);
+    const scale = isHover ? 1.05 : 1.0;
+    
+    // Calculate scaled dimensions
+    const scaledWidth = button.width * scale;
+    const scaledHeight = button.height * scale;
+    const scaledX = centerX - scaledWidth / 2;
+    const scaledY = button.y - (scaledHeight - button.height) / 2;
+    
+    // Colors matching the background image design
+    let baseColor, lightColor, darkColor, borderColor, textColor, iconColor;
+    if (isSummer) {
+        // Bright yellow-gold for Summer (matching the image)
+        baseColor = '#FFD700';      // Gold
+        lightColor = '#FFED4E';     // Light gold
+        darkColor = '#D4AF37';      // Darker gold
+        borderColor = '#FFD700';    // Glowing neon outline
+        textColor = '#FFD700';      // Glowing yellow text
+        iconColor = '#FFD700';      // Yellow sun icon
+    } else {
+        // Vibrant light blue for Winter (matching the image)
+        baseColor = '#00BFFF';      // Light blue
+        lightColor = '#87CEEB';     // Sky blue
+        darkColor = '#0096FF';     // Deeper blue
+        borderColor = '#00BFFF';   // Glowing neon outline
+        textColor = '#00BFFF';     // Glowing blue text
+        iconColor = '#00BFFF';     // Blue snowflake icons
+    }
+    
+    // Draw drop shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    drawRoundedRect(scaledX + 3, scaledY + 3, scaledWidth, scaledHeight, radius);
+    ctx.fill();
+    
+    // Main button body with metallic beveled gradient
+    const gradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight);
+    gradient.addColorStop(0, lightColor);
+    gradient.addColorStop(0.3, baseColor);
+    gradient.addColorStop(0.7, baseColor);
+    gradient.addColorStop(1, darkColor);
+    
+    ctx.fillStyle = gradient;
+    drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
+    ctx.fill();
+    
+    // Inner highlight for beveled effect (top highlight)
+    const highlightGradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight * 0.3);
+    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+    highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = highlightGradient;
+    drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
+    ctx.fill();
+    
+    // Outer glowing neon border
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = isHover ? 4 : 3;
+    ctx.shadowBlur = isHover ? 20 : 15;
+    ctx.shadowColor = borderColor;
+    drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Hover glow effect
+    if (isHover) {
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = borderColor;
+        drawRoundedRect(scaledX - 2, scaledY - 2, scaledWidth + 4, scaledHeight + 4, radius + 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+    }
+    
+    // Draw icons and text
+    const iconSize = 28;
+    const textY = button.y + button.height / 2;
+    const textSize = 40; // Larger text for better visibility
+    
+    if (isSummer) {
+        // Sun icon to the left of "SUMMER" text
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = iconColor;
+        drawSunIcon(centerX - scaledWidth / 2 + 35, textY, iconSize, iconColor);
+        ctx.shadowBlur = 0;
+        
+        // "SUMMER" text - clean white text with smooth colored glow
+        ctx.font = `bold ${textSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Smooth colored stroke outline
+        ctx.strokeStyle = textColor;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 0;
+        ctx.strokeText(text, centerX, textY);
+        
+        // Main white text with smooth colored glow
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = textColor;
+        ctx.fillText(text, centerX, textY);
+        ctx.shadowBlur = 0;
+    } else {
+        // Snowflake icons to the left and right of "WINTER" text
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = iconColor;
+        drawSnowflakeIcon(centerX - scaledWidth / 2 + 30, textY, iconSize, iconColor);
+        drawSnowflakeIcon(centerX + scaledWidth / 2 - 30, textY, iconSize, iconColor);
+        ctx.shadowBlur = 0;
+        
+        // "WINTER" text - clean white text with smooth colored glow
+        ctx.font = `bold ${textSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Smooth colored stroke outline
+        ctx.strokeStyle = textColor;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 0;
+        ctx.strokeText(text, centerX, textY);
+        
+        // Main white text with smooth colored glow
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = textColor;
+        ctx.fillText(text, centerX, textY);
+        ctx.shadowBlur = 0;
+    }
+}
+
 // Draw lives
 function drawLives(x, y, lives) {
     const img = assets.lives.white;
@@ -244,34 +763,49 @@ function showThemeSelectionScreen() {
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
     }
     
-    drawText("Select a Theme", 35, WIDTH / 2, HEIGHT / 2 - 45);
+    // Theme buttons with futuristic metallic styling
+    const buttonWidth = 220;
+    const buttonHeight = 80;
+    const buttonRadius = 20;
+    const buttonY = HEIGHT / 2; // Position buttons in center
+    const summerButtonCenterX = WIDTH / 4;
+    const winterButtonCenterX = 3 * WIDTH / 4;
     
-    // Theme buttons
-    const summerButton = { x: WIDTH / 4 - 75, y: HEIGHT / 2 - 27.5, width: 150, height: 55 };
-    const winterButton = { x: 3 * WIDTH / 4 - 75, y: HEIGHT / 2 - 27.5, width: 150, height: 55 };
-    
-    ctx.fillStyle = GREEN;
-    ctx.fillRect(summerButton.x, summerButton.y, summerButton.width, summerButton.height);
-    
-    ctx.fillStyle = BLUE;
-    ctx.fillRect(winterButton.x, winterButton.y, winterButton.width, winterButton.height);
-    
-    drawText("Summer", 20, WIDTH / 4, HEIGHT / 2);
-    drawText("Winter", 20, 3 * WIDTH / 4, HEIGHT / 2);
-    
-    // Draw professor
-    const professorX = 20;
-    const professorY = HEIGHT / 2 - assets.professor.height / 2;
-    ctx.drawImage(assets.professor, professorX, professorY);
-    
-    const professorRect = {
-        x: professorX,
-        y: professorY,
-        width: assets.professor.width,
-        height: assets.professor.height
+    // Store button positions globally for consistent click detection
+    themeButtons.summerButton = { 
+        x: summerButtonCenterX - buttonWidth / 2, 
+        y: buttonY, 
+        width: buttonWidth, 
+        height: buttonHeight,
+        centerX: summerButtonCenterX
+    };
+    themeButtons.winterButton = { 
+        x: winterButtonCenterX - buttonWidth / 2, 
+        y: buttonY, 
+        width: buttonWidth, 
+        height: buttonHeight,
+        centerX: winterButtonCenterX
     };
     
-    return { summerButton, winterButton, professorRect };
+    // Draw Summer button - gold metallic with sun icon
+    drawThemeButton(
+        themeButtons.summerButton,
+        "SUMMER",
+        summerButtonCenterX,
+        true, // isSummer
+        buttonRadius
+    );
+    
+    // Draw Winter button - light blue metallic with snowflake icons
+    drawThemeButton(
+        themeButtons.winterButton,
+        "WINTER",
+        winterButtonCenterX,
+        false, // isSummer
+        buttonRadius
+    );
+    
+    return { summerButton: themeButtons.summerButton, winterButton: themeButtons.winterButton };
 }
 
 // Display random fact
@@ -453,26 +987,51 @@ document.addEventListener('keydown', (e) => {
 
 function handleClick(x, y) {
     if (gameState === 'theme') {
-        const themeScreen = showThemeSelectionScreen();
-        const summerButton = themeScreen.summerButton;
-        const winterButton = themeScreen.winterButton;
-        const professorRect = themeScreen.professorRect;
+        // Use stored button positions for consistent click detection
+        const summerButton = themeButtons.summerButton;
+        const winterButton = themeButtons.winterButton;
         
-        if (x >= summerButton.x && x <= summerButton.x + summerButton.width &&
-            y >= summerButton.y && y <= summerButton.y + summerButton.height) {
+        // Check if buttons are initialized
+        if (!summerButton || !winterButton) {
+            return; // Buttons not ready yet
+        }
+        
+        // Check Summer button click (with padding for better UX)
+        const padding = 5;
+        if (x >= summerButton.x - padding && x <= summerButton.x + summerButton.width + padding &&
+            y >= summerButton.y - padding && y <= summerButton.y + summerButton.height + padding) {
             theme = "Summer";
             loadThemeBackground(theme);
-            gameState = 'menu';
-        } else if (x >= winterButton.x && x <= winterButton.x + winterButton.width &&
-                   y >= winterButton.y && y <= winterButton.y + winterButton.height) {
+            // Start game immediately after theme selection
+            gameState = 'playing';
+            gameOver = false;
+            playerLives = 3;
+            score = 0;
+            fruitSpawnRate = 0.2;
+            bombFrequency = 0.1;
+            currentDifficulty = "Easy";
+            startTime = Date.now();
+            currentTime = 0;
+            mouseTrail = [];
+            initializeFruits();
+        } 
+        // Check Winter button click (with padding for better UX)
+        else if (x >= winterButton.x - padding && x <= winterButton.x + winterButton.width + padding &&
+                 y >= winterButton.y - padding && y <= winterButton.y + winterButton.height + padding) {
             theme = "Winter";
             loadThemeBackground(theme);
-            gameState = 'menu';
-        } else if (x >= professorRect.x && x <= professorRect.x + professorRect.width &&
-                   y >= professorRect.y && y <= professorRect.y + professorRect.height) {
-            currentFact = displayRandomFact();
-            factScrollX = WIDTH;
-            factDisplayTime = Date.now();
+            // Start game immediately after theme selection
+            gameState = 'playing';
+            gameOver = false;
+            playerLives = 3;
+            score = 0;
+            fruitSpawnRate = 0.2;
+            bombFrequency = 0.1;
+            currentDifficulty = "Easy";
+            startTime = Date.now();
+            currentTime = 0;
+            mouseTrail = [];
+            initializeFruits();
         }
     } else if (gameState === 'menu') {
         gameState = 'playing';
@@ -534,11 +1093,32 @@ function handleClick(x, y) {
 
 // Main game loop
 function gameLoop() {
+    // Update cybersecurity effects
+    glitchTimer += 0.1;
+    scanlineOffset = (scanlineOffset + 2) % 6;
+    
     // Clear canvas
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     
     if (gameState === 'theme') {
         showThemeSelectionScreen();
+        
+        // Change cursor to pointer when hovering over buttons
+        const summerButton = themeButtons.summerButton;
+        const winterButton = themeButtons.winterButton;
+        if (summerButton && winterButton) {
+            const padding = 5;
+            const isOverSummer = mouseX >= summerButton.x - padding && mouseX <= summerButton.x + summerButton.width + padding &&
+                                mouseY >= summerButton.y - padding && mouseY <= summerButton.y + summerButton.height + padding;
+            const isOverWinter = mouseX >= winterButton.x - padding && mouseX <= winterButton.x + winterButton.width + padding &&
+                                mouseY >= winterButton.y - padding && mouseY <= winterButton.y + winterButton.height + padding;
+            
+            if (isOverSummer || isOverWinter) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        }
         
         // Display fact if active
         if (currentFact && Date.now() - factDisplayTime < factDisplayDuration) {
@@ -555,8 +1135,10 @@ function gameLoop() {
             }
         }
     } else if (gameState === 'menu') {
+        canvas.style.cursor = 'default';
         showGameOverScreen();
     } else if (gameState === 'playing') {
+        canvas.style.cursor = 'crosshair';
         // Draw background
         ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
         
@@ -656,6 +1238,7 @@ function gameLoop() {
             }
         }
     } else if (gameState === 'gameover') {
+        canvas.style.cursor = 'default';
         showGameOverScreen();
     }
     
