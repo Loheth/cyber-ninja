@@ -1,8 +1,17 @@
 // Game Constants
-const WIDTH = 800;
-const HEIGHT = 500;
+let WIDTH = window.innerWidth;
+let HEIGHT = window.innerHeight;
 const FPS = 60;
 const GAME_DURATION = 60; // seconds
+
+// Function to resize canvas
+function resizeCanvas() {
+    WIDTH = window.innerWidth;
+    HEIGHT = window.innerHeight;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    factScrollX = WIDTH / 1.6;
+}
 
 // Game State
 let playerLives = 3;
@@ -50,10 +59,18 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const loadingScreen = document.getElementById('loadingScreen');
 
+// Set initial canvas size
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
+
+// Handle window resize
+window.addEventListener('resize', resizeCanvas);
+
 // Game assets
 const assets = {
     background: null,
-    summerBg: null,
+    themeSelectionBg: null, // Background for theme selection screen
+    summerBg: null, // Background for summer gameplay
     winterBg: null,
     professor: null,
     fruits: {},
@@ -89,7 +106,10 @@ function loadImage(src) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
-        img.onerror = reject;
+        img.onerror = () => {
+            console.error(`Failed to load image: ${src}`);
+            reject(new Error(`Failed to load image: ${src}`));
+        };
         img.src = src;
     });
 }
@@ -97,12 +117,27 @@ function loadImage(src) {
 async function loadAssets() {
     try {
         // Load backgrounds
-        assets.summerBg = await loadImage('summer.jpg');
-        assets.winterBg = await loadImage('winter.jpg');
-        assets.background = assets.summerBg;
+        // Theme selection screen background (initial screen)
+        console.log('Loading theme selection background...');
+        assets.themeSelectionBg = await loadImage('images/backgound.png');
+        console.log('Theme selection background loaded successfully');
+        
+        // Summer gameplay background (cyber-tropical image)
+        // Replace 'summer.png' with your cyber-tropical image filename when you add it
+        console.log('Loading summer background...');
+        assets.summerBg = await loadImage('summer.png'); // TODO: Replace with your cyber-tropical image
+        console.log('Summer background loaded successfully');
+        
+        console.log('Loading winter background...');
+        assets.winterBg = await loadImage('winter.png');
+        console.log('Winter background loaded successfully');
+        
+        assets.background = assets.themeSelectionBg; // Use theme selection bg initially
         
         // Load professor
+        console.log('Loading professor image...');
         assets.professor = await loadImage('professor.png');
+        console.log('Professor image loaded successfully');
         
         // Load fruit images
         for (const fruit of fruits) {
@@ -135,7 +170,7 @@ async function loadAssets() {
 // Generate random fruit
 function generateRandomFruit(fruit) {
     fruitData[fruit] = {
-        x: Math.random() * (500 - 100) + 100,
+        x: Math.random() * (WIDTH - 100) + 50,
         y: HEIGHT, // Start at bottom of screen
         speedX: (Math.random() * 2 - 1), // Horizontal movement: -1 to 1 (scaled for 60 FPS)
         speedY: -(Math.random() * 6 + 8), // Upward speed: -8 to -14 (higher bounce)
@@ -177,7 +212,8 @@ function hideCrossLives(x, y, livesLost) {
     const img = assets.lives.red;
     if (!img) return;
     
-    const positions = [690, 725, 760];
+    const startX = WIDTH - 110;
+    const positions = [startX, startX + 35, startX + 70];
     for (let i = 0; i < livesLost; i++) {
         if (positions[i]) {
             ctx.drawImage(img, positions[i], y, 30, 30);
@@ -198,9 +234,16 @@ function loadThemeBackground(selectedTheme) {
 
 // Show theme selection screen
 function showThemeSelectionScreen() {
-    ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
+    // Use themeSelectionBg if available, otherwise fallback to summerBg
+    const bgImage = assets.themeSelectionBg || assets.summerBg || assets.background;
+    if (bgImage) {
+        ctx.drawImage(bgImage, 0, 0, WIDTH, HEIGHT);
+    } else {
+        // Fallback: draw a black background if no image is loaded
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    }
     
-    drawText("FRUIT NINJA!", 70, WIDTH / 2, HEIGHT / 5);
     drawText("Select a Theme", 35, WIDTH / 2, HEIGHT / 2 - 45);
     
     // Theme buttons
@@ -251,7 +294,6 @@ function displayRandomFact() {
 // Show game over screen
 function showGameOverScreen() {
     ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
-    drawText("FRUIT NINJA!", 70, WIDTH / 2, HEIGHT / 4);
     
     if (!gameOver) {
         drawText("Score : " + score, 35, WIDTH / 2, HEIGHT / 2);
@@ -465,13 +507,13 @@ function handleClick(x, y) {
                         playerLives--;
                         
                         if (playerLives === 0) {
-                            hideCrossLives(690, 15, 3);
+                            hideCrossLives(WIDTH - 110, 15, 3);
                             gameState = 'gameover';
                             gameOver = true;
                         } else if (playerLives === 1) {
-                            hideCrossLives(690, 15, 2);
+                            hideCrossLives(WIDTH - 110, 15, 2);
                         } else if (playerLives === 2) {
-                            hideCrossLives(690, 15, 1);
+                            hideCrossLives(WIDTH - 110, 15, 1);
                         }
                         
                         value.img = assets.explosion;
@@ -534,7 +576,7 @@ function gameLoop() {
         drawText('Score : ' + score, 42, 0, 20, WHITE, 'left');
         
         // Draw lives
-        drawLives(690, 5, playerLives);
+        drawLives(WIDTH - 110, 5, playerLives);
         
         // Calculate player accuracy and adjust difficulty
         const playerAccuracy = (score + 1) / (score + 2);
@@ -552,9 +594,6 @@ function gameLoop() {
                 currentDifficulty = "Easy";
             }
         }
-        
-        // Display difficulty
-        displayDifficultyLevel();
         
         // Update and draw fruits
         for (const [key, value] of Object.entries(fruitData)) {
