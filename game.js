@@ -252,7 +252,6 @@ function displayRandomFact() {
 function showGameOverScreen() {
     ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
     drawText("FRUIT NINJA!", 70, WIDTH / 2, HEIGHT / 4);
-    drawText("Made by Vanshika & Rahul :)", 20, WIDTH / 2, HEIGHT / 2.4);
     
     if (!gameOver) {
         drawText("Score : " + score, 35, WIDTH / 2, HEIGHT / 2);

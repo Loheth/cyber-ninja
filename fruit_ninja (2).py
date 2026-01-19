@@ -18,7 +18,7 @@ WIDTH = 800
 HEIGHT = 500
 FPS = 10                                               #controls how often the gameDisplay should refresh. In our case, it will refresh every 1/12th second
 pygame.init()
-pygame.display.set_caption('Fruit-Ninja Game -- DataFlair')
+pygame.display.set_caption('Fruit Ninja Game')
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))   #setting game display size
 clock = pygame.time.Clock()
 
@@ -227,7 +227,6 @@ def show_gameover_screen():
 
     gameDisplay.blit(background, (0,0))
     draw_text(gameDisplay, "FRUIT NINJA!", 70, WIDTH / 2, HEIGHT / 4)
-    draw_text(gameDisplay, "Made by Vanshika & Rahul :)", 20, WIDTH / 2, HEIGHT / 2.4)
     if not game_over :
         draw_text(gameDisplay,"Score : " + str(score), 35, WIDTH / 2, HEIGHT /2)
 
