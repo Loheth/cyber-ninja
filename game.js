@@ -804,7 +804,7 @@ function drawBinaryPattern(x, y, width, height) {
     ctx.restore();
 }
 
-// Draw button matching the design from background.png
+// Draw vibrant colorful theme buttons
 function drawThemeButton(button, text, centerX, isSummer, radius) {
     const isHover = isHovering(button, centerX);
     const scale = isHover ? 1.05 : 1.0;
@@ -815,124 +815,123 @@ function drawThemeButton(button, text, centerX, isSummer, radius) {
     const scaledX = centerX - scaledWidth / 2;
     const scaledY = button.y - (scaledHeight - button.height) / 2;
     
-    // Colors matching the background image design
-    let baseColor, lightColor, darkColor, borderColor, textColor, iconColor;
+    // Vibrant color schemes
+    let bgGradient, borderColor, textColor, iconColor;
     if (isSummer) {
-        // Bright yellow-gold for Summer (matching the image)
-        baseColor = '#FFD700';      // Gold
-        lightColor = '#FFED4E';     // Light gold
-        darkColor = '#D4AF37';      // Darker gold
-        borderColor = '#FFD700';    // Glowing neon outline
-        textColor = '#FFD700';      // Glowing yellow text
-        iconColor = '#FFD700';      // Yellow sun icon
+        // Warm summer colors: orange to yellow gradient
+        bgGradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight);
+        bgGradient.addColorStop(0, '#FF8C00');      // Dark orange
+        bgGradient.addColorStop(0.5, '#FFA500');    // Orange
+        bgGradient.addColorStop(1, '#FFD700');      // Gold
+        borderColor = '#FFD700';
+        textColor = '#FFFFFF';
+        iconColor = '#FFD700';
     } else {
-        // Vibrant light blue for Winter (matching the image)
-        baseColor = '#00BFFF';      // Light blue
-        lightColor = '#87CEEB';     // Sky blue
-        darkColor = '#0096FF';     // Deeper blue
-        borderColor = '#00BFFF';   // Glowing neon outline
-        textColor = '#00BFFF';     // Glowing blue text
-        iconColor = '#00BFFF';     // Blue snowflake icons
+        // Cool winter colors: blue to cyan gradient
+        bgGradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight);
+        bgGradient.addColorStop(0, '#1E90FF');      // Dodger blue
+        bgGradient.addColorStop(0.5, '#00BFFF');    // Deep sky blue
+        bgGradient.addColorStop(1, '#00CED1');      // Dark turquoise
+        borderColor = '#00FFFF';
+        textColor = '#FFFFFF';
+        iconColor = '#00FFFF';
     }
     
     // Draw drop shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    drawRoundedRect(scaledX + 3, scaledY + 3, scaledWidth, scaledHeight, radius);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    drawRoundedRect(scaledX + 4, scaledY + 4, scaledWidth, scaledHeight, radius);
     ctx.fill();
     
-    // Main button body with metallic beveled gradient
-    const gradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight);
-    gradient.addColorStop(0, lightColor);
-    gradient.addColorStop(0.3, baseColor);
-    gradient.addColorStop(0.7, baseColor);
-    gradient.addColorStop(1, darkColor);
-    
-    ctx.fillStyle = gradient;
+    // Main button body with vibrant gradient
+    ctx.fillStyle = bgGradient;
     drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
     ctx.fill();
     
-    // Inner highlight for beveled effect (top highlight)
-    const highlightGradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight * 0.3);
-    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-    highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = highlightGradient;
-    drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
+    // Add shine/gloss effect
+    const shineGradient = ctx.createLinearGradient(scaledX, scaledY, scaledX, scaledY + scaledHeight * 0.6);
+    shineGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+    shineGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
+    shineGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = shineGradient;
+    drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight * 0.6, radius);
     ctx.fill();
     
-    // Outer glowing neon border
+    // Outer glowing border
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = isHover ? 4 : 3;
-    ctx.shadowBlur = isHover ? 20 : 15;
+    ctx.lineWidth = isHover ? 5 : 4;
+    ctx.shadowBlur = isHover ? 25 : 20;
     ctx.shadowColor = borderColor;
     drawRoundedRect(scaledX, scaledY, scaledWidth, scaledHeight, radius);
     ctx.stroke();
     ctx.shadowBlur = 0;
     
+    // Inner border highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(scaledX + 2, scaledY + 2, scaledWidth - 4, scaledHeight - 4, radius - 2);
+    ctx.stroke();
+    
     // Hover glow effect
     if (isHover) {
         ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.5;
-        ctx.shadowBlur = 30;
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.6;
+        ctx.shadowBlur = 40;
         ctx.shadowColor = borderColor;
-        drawRoundedRect(scaledX - 2, scaledY - 2, scaledWidth + 4, scaledHeight + 4, radius + 2);
+        drawRoundedRect(scaledX - 4, scaledY - 4, scaledWidth + 8, scaledHeight + 8, radius + 4);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
         ctx.shadowBlur = 0;
     }
     
     // Draw icons and text
-    const iconSize = 28;
+    const iconSize = 32;
     const textY = button.y + button.height / 2;
-    const textSize = 40; // Larger text for better visibility
+    const textSize = 42;
     
     if (isSummer) {
         // Sun icon to the left of "SUMMER" text
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = iconColor;
         drawSunIcon(centerX - scaledWidth / 2 + 35, textY, iconSize, iconColor);
         ctx.shadowBlur = 0;
         
-        // "SUMMER" text - clean white text with smooth colored glow
+        // "SUMMER" text - bold white with shadow
         ctx.font = `bold ${textSize}px Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Smooth colored stroke outline
-        ctx.strokeStyle = textColor;
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 0;
-        ctx.strokeText(text, centerX, textY);
+        // Text shadow for depth
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillText(text, centerX + 3, textY + 3);
         
-        // Main white text with smooth colored glow
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = textColor;
+        // Main white text
+        ctx.fillStyle = textColor;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.fillText(text, centerX, textY);
         ctx.shadowBlur = 0;
     } else {
         // Snowflake icons to the left and right of "WINTER" text
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = iconColor;
         drawSnowflakeIcon(centerX - scaledWidth / 2 + 30, textY, iconSize, iconColor);
         drawSnowflakeIcon(centerX + scaledWidth / 2 - 30, textY, iconSize, iconColor);
         ctx.shadowBlur = 0;
         
-        // "WINTER" text - clean white text with smooth colored glow
+        // "WINTER" text - bold white with shadow
         ctx.font = `bold ${textSize}px Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Smooth colored stroke outline
-        ctx.strokeStyle = textColor;
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 0;
-        ctx.strokeText(text, centerX, textY);
+        // Text shadow for depth
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillText(text, centerX + 3, textY + 3);
         
-        // Main white text with smooth colored glow
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = textColor;
+        // Main white text
+        ctx.fillStyle = textColor;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.fillText(text, centerX, textY);
         ctx.shadowBlur = 0;
     }
@@ -1233,9 +1232,32 @@ function saveLeaderboard() {
 
 // Add score to leaderboard
 function addToLeaderboard(name, score) {
-    leaderboard.push({ name: name || 'Anonymous', score: score, date: new Date().toISOString() });
+    const playerName = name || 'Anonymous';
+    const normalizedName = playerName.toLowerCase().trim();
+    
+    // Check if player already exists (case-insensitive)
+    const existingPlayerIndex = leaderboard.findIndex(
+        entry => entry.name.toLowerCase().trim() === normalizedName
+    );
+    
+    if (existingPlayerIndex !== -1) {
+        // Player exists - update score if new score is higher
+        if (score > leaderboard[existingPlayerIndex].score) {
+            leaderboard[existingPlayerIndex].score = score;
+            leaderboard[existingPlayerIndex].date = new Date().toISOString();
+        }
+    } else {
+        // New player - add to leaderboard
+        leaderboard.push({ 
+            name: playerName, 
+            score: score, 
+            date: new Date().toISOString() 
+        });
+    }
+    
+    // Sort by score (descending) and keep top 10
     leaderboard.sort((a, b) => b.score - a.score);
-    leaderboard = leaderboard.slice(0, 10); // Keep top 10
+    leaderboard = leaderboard.slice(0, 10);
     saveLeaderboard();
 }
 
