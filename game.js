@@ -32,6 +32,10 @@ let firstRound = true;
 let theme = "Summer";
 let startTime = 0;
 let factsDisplayed = [];
+let heartPopAnimations = []; // Track heart pop animations
+let playerName = "";
+let currentNameInput = "";
+let leaderboard = [];
 
 // Fruits array
 const fruits = ['melon', 'orange', 'pomegranate', 'guava', 'bomb'];
@@ -108,7 +112,7 @@ let glitchTimer = 0;
 let scanlineOffset = 0;
 
 // Game state
-let gameState = 'loading'; // 'loading', 'theme', 'menu', 'playing', 'gameover'
+let gameState = 'loading'; // 'loading', 'theme', 'menu', 'playing', 'gameover', 'nameinput', 'leaderboard'
 
 // Theme button positions (stored globally for consistent click detection)
 let themeButtons = {
@@ -205,6 +209,227 @@ function drawText(text, size, x, y, color = WHITE, align = 'center') {
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
+}
+
+// Draw combined score and timer display
+function drawScoreAndTimer(score, remainingTime, x, y, isLarge = false, centerAlign = false) {
+    const scoreFontSize = isLarge ? 50 : 28;
+    const timerFontSize = isLarge ? 42 : 24;
+    const padding = isLarge ? 35 : 18;
+    const itemSpacing = isLarge ? 15 : 10;
+    const borderRadius = 18;
+    
+    // Score and timer text
+    const scoreText = `Score: ${score}`;
+    const timerText = `Time: ${remainingTime}s`;
+    
+    // Measure both texts
+    ctx.font = `bold ${scoreFontSize}px 'Arial', sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const scoreMetrics = ctx.measureText(scoreText);
+    const scoreWidth = scoreMetrics.width;
+    const scoreHeight = scoreFontSize;
+    
+    ctx.font = `bold ${timerFontSize}px 'Arial', sans-serif`;
+    const timerMetrics = ctx.measureText(timerText);
+    const timerWidth = timerMetrics.width;
+    const timerHeight = timerFontSize;
+    
+    // Calculate panel dimensions (use the wider of the two texts)
+    const maxTextWidth = Math.max(scoreWidth, timerWidth);
+    const panelWidth = maxTextWidth + padding * 2;
+    const panelHeight = scoreHeight + timerHeight + itemSpacing + padding * 2;
+    const panelX = centerAlign ? x - panelWidth / 2 : x;
+    const panelY = y - panelHeight / 2;
+    
+    // Draw panel shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    drawRoundedRect(panelX + 5, panelY + 5, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw panel background with gradient
+    const bgGradient = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelHeight);
+    bgGradient.addColorStop(0, 'rgba(25, 25, 45, 0.98)');
+    bgGradient.addColorStop(0.3, 'rgba(20, 20, 40, 0.98)');
+    bgGradient.addColorStop(0.7, 'rgba(15, 15, 35, 0.98)');
+    bgGradient.addColorStop(1, 'rgba(10, 10, 30, 0.98)');
+    ctx.fillStyle = bgGradient;
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw inner highlight
+    const highlightGradient = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelHeight * 0.5);
+    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+    highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = highlightGradient;
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw divider line between score and timer
+    const dividerY = panelY + padding + scoreHeight + itemSpacing / 2;
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(panelX + padding * 0.5, dividerY);
+    ctx.lineTo(panelX + panelWidth - padding * 0.5, dividerY);
+    ctx.stroke();
+    
+    // Determine border color based on remaining time
+    let borderColor = '#00FFFF';
+    if (remainingTime <= 10) {
+        borderColor = '#FF0000'; // Red when time is low
+    } else if (remainingTime <= 20) {
+        borderColor = '#FFAA00'; // Orange when time is getting low
+    }
+    
+    // Draw glowing border
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = borderColor;
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Draw inner border for depth
+    ctx.strokeStyle = `rgba(${remainingTime <= 10 ? '255, 0, 0' : remainingTime <= 20 ? '255, 170, 0' : '0, 255, 255'}, 0.4)`;
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(panelX + 2, panelY + 2, panelWidth - 4, panelHeight - 4, borderRadius - 2);
+    ctx.stroke();
+    
+    // Draw score text
+    const scoreY = panelY + padding + scoreHeight / 2;
+    const scoreTextGradient = ctx.createLinearGradient(
+        panelX + padding, 
+        scoreY - scoreHeight / 2,
+        panelX + padding, 
+        scoreY + scoreHeight / 2
+    );
+    scoreTextGradient.addColorStop(0, '#FFFFFF');
+    scoreTextGradient.addColorStop(0.5, '#00FFFF');
+    scoreTextGradient.addColorStop(1, '#FFFFFF');
+    
+    ctx.font = `bold ${scoreFontSize}px 'Arial', sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    
+    // Score text shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillText(scoreText, panelX + padding + 2, scoreY + 2);
+    
+    // Score text with gradient
+    ctx.fillStyle = scoreTextGradient;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#00FFFF';
+    ctx.fillText(scoreText, panelX + padding, scoreY);
+    ctx.shadowBlur = 0;
+    
+    // Draw timer text
+    const timerY = panelY + padding + scoreHeight + itemSpacing + timerHeight / 2;
+    const timerTextGradient = ctx.createLinearGradient(
+        panelX + padding, 
+        timerY - timerHeight / 2,
+        panelX + padding, 
+        timerY + timerHeight / 2
+    );
+    timerTextGradient.addColorStop(0, '#FFFFFF');
+    timerTextGradient.addColorStop(0.5, borderColor);
+    timerTextGradient.addColorStop(1, '#FFFFFF');
+    
+    ctx.font = `bold ${timerFontSize}px 'Arial', sans-serif`;
+    
+    // Timer text shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillText(timerText, panelX + padding + 2, timerY + 2);
+    
+    // Timer text with gradient
+    ctx.fillStyle = timerTextGradient;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = borderColor;
+    ctx.fillText(timerText, panelX + padding, timerY);
+    ctx.shadowBlur = 0;
+}
+
+// Draw styled score display (for game over screen)
+function drawStyledScore(score, x, y, isLarge = false, centerAlign = false) {
+    const fontSize = isLarge ? 60 : 32;
+    const padding = isLarge ? 40 : 20;
+    const borderRadius = 15;
+    
+    // Score text
+    const scoreText = `Score: ${score}`;
+    ctx.font = `bold ${fontSize}px 'Arial', sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const textMetrics = ctx.measureText(scoreText);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize;
+    
+    // Calculate panel dimensions
+    const panelWidth = textWidth + padding * 2;
+    const panelHeight = textHeight + padding * 1.5;
+    const panelX = centerAlign ? x - panelWidth / 2 : x;
+    const panelY = y - panelHeight / 2;
+    
+    // Draw panel shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    drawRoundedRect(panelX + 4, panelY + 4, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw panel background with gradient
+    const bgGradient = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelHeight);
+    bgGradient.addColorStop(0, 'rgba(30, 30, 50, 0.95)');
+    bgGradient.addColorStop(0.5, 'rgba(20, 20, 40, 0.95)');
+    bgGradient.addColorStop(1, 'rgba(10, 10, 30, 0.95)');
+    ctx.fillStyle = bgGradient;
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw inner highlight
+    const highlightGradient = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelHeight * 0.4);
+    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+    highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = highlightGradient;
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw glowing border
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00FFFF';
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, borderRadius);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Draw inner border for depth
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(panelX + 2, panelY + 2, panelWidth - 4, panelHeight - 4, borderRadius - 2);
+    ctx.stroke();
+    
+    // Draw score text with gradient
+    const textGradient = ctx.createLinearGradient(
+        panelX + padding, 
+        panelY + panelHeight / 2 - textHeight / 2,
+        panelX + padding, 
+        panelY + panelHeight / 2 + textHeight / 2
+    );
+    textGradient.addColorStop(0, '#FFFFFF');
+    textGradient.addColorStop(0.5, '#00FFFF');
+    textGradient.addColorStop(1, '#FFFFFF');
+    
+    // Draw text shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillText(scoreText, panelX + padding + 2, panelY + panelHeight / 2 + 2);
+    
+    // Draw main text with gradient
+    ctx.fillStyle = textGradient;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00FFFF';
+    ctx.fillText(scoreText, panelX + padding, panelY + panelHeight / 2);
+    ctx.shadowBlur = 0;
 }
 
 // Draw styled text with shadow and gradient effect
@@ -716,28 +941,193 @@ function drawThemeButton(button, text, centerX, isSummer, radius) {
     }
 }
 
-// Draw lives
-function drawLives(x, y, lives) {
-    const img = assets.lives.white;
-    if (!img) return;
+// Draw Minecraft-style heart
+function drawMinecraftHeart(x, y, size, filled = true) {
+    ctx.save();
     
-    for (let i = 0; i < lives; i++) {
-        ctx.drawImage(img, x + 35 * i, y, 30, 30);
+    const heartSize = size;
+    const centerX = x + heartSize / 2;
+    const centerY = y + heartSize / 2;
+    const scale = heartSize / 18; // Minecraft hearts are typically 18x18 pixels
+    
+    ctx.translate(centerX, centerY);
+    ctx.scale(scale, scale);
+    
+    if (filled) {
+        // Draw filled red heart (Minecraft style)
+        ctx.fillStyle = '#FF0000';
+        ctx.beginPath();
+        // Left lobe
+        ctx.arc(-4, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Right lobe
+        ctx.beginPath();
+        ctx.arc(4, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Bottom point
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(0, 8);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(4, -2);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(-4, -2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add subtle highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(-4, -1, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(4, -1, 2, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // Draw empty/outline heart (Minecraft style)
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        
+        // Left lobe outline
+        ctx.beginPath();
+        ctx.arc(-4, 0, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+        
+        // Right lobe outline
+        ctx.beginPath();
+        ctx.arc(4, 0, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+        
+        // Bottom point outline
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(0, 8);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(4, -2);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(-4, -2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+// Heart pop particle
+function createHeartPopParticles(x, y) {
+    const particles = [];
+    const particleCount = 12;
+    for (let i = 0; i < particleCount; i++) {
+        const angle = (Math.PI * 2 * i) / particleCount;
+        const speed = 2 + Math.random() * 3;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            decay: 0.02 + Math.random() * 0.02,
+            size: 3 + Math.random() * 4
+        });
+    }
+    return particles;
+}
+
+// Update heart pop animations
+function updateHeartPopAnimations() {
+    for (let i = heartPopAnimations.length - 1; i >= 0; i--) {
+        const anim = heartPopAnimations[i];
+        anim.progress += 0.05;
+        
+        // Update particles
+        for (let j = anim.particles.length - 1; j >= 0; j--) {
+            const p = anim.particles[j];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.95; // Friction
+            p.vy *= 0.95;
+            p.life -= p.decay;
+            
+            if (p.life <= 0) {
+                anim.particles.splice(j, 1);
+            }
+        }
+        
+        // Remove animation when complete
+        if (anim.progress >= 1.0 || anim.particles.length === 0) {
+            heartPopAnimations.splice(i, 1);
+        }
     }
 }
 
-// Hide lives (show red crosses)
-function hideCrossLives(x, y, livesLost) {
-    const img = assets.lives.red;
-    if (!img) return;
+// Draw heart pop animation
+function drawHeartPopAnimation(anim, heartX, heartY, heartSize) {
+    // Draw shrinking heart
+    const scale = 1 - anim.progress;
+    const currentSize = heartSize * scale;
+    const alpha = 1 - anim.progress;
     
-    const startX = WIDTH - 110;
-    const positions = [startX, startX + 35, startX + 70];
-    for (let i = 0; i < livesLost; i++) {
-        if (positions[i]) {
-            ctx.drawImage(img, positions[i], y, 30, 30);
-        }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowBlur = 15 * scale;
+    ctx.shadowColor = '#FF0000';
+    drawMinecraftHeart(heartX + (heartSize - currentSize) / 2, heartY + (heartSize - currentSize) / 2, currentSize, true);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    
+    // Draw particles
+    for (const p of anim.particles) {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = '#FF0000';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#FF0000';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
     }
+}
+
+// Draw lives with Minecraft-style hearts
+function drawLives(x, y, lives) {
+    const heartSize = 40;
+    const heartSpacing = 45;
+    
+    // Update pop animations
+    updateHeartPopAnimations();
+    
+    // Draw hearts
+    for (let i = 0; i < 3; i++) {
+        const heartX = x + heartSpacing * i;
+        const heartY = y;
+        
+        // Check if this heart is popping
+        const popAnim = heartPopAnimations.find(anim => anim.heartIndex === i);
+        
+        if (popAnim) {
+            // Draw pop animation
+            drawHeartPopAnimation(popAnim, heartX, heartY, heartSize);
+        } else if (i < lives) {
+            // Draw filled heart with subtle glow
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#FF0000';
+            drawMinecraftHeart(heartX, heartY, heartSize, true);
+            ctx.shadowBlur = 0;
+        }
+        // Don't draw anything if heart is lost and not popping
+    }
+}
+
+// Hide lives (show red crosses) - Updated to work with new drawLives function
+function hideCrossLives(x, y, livesLost) {
+    // This function is now handled within drawLives, but keeping for compatibility
+    // The drawLives function now handles showing lost lives automatically
 }
 
 // Load theme background
@@ -825,12 +1215,173 @@ function displayRandomFact() {
     return fact;
 }
 
+// Load leaderboard from localStorage
+function loadLeaderboard() {
+    const stored = localStorage.getItem('fruitNinjaLeaderboard');
+    if (stored) {
+        leaderboard = JSON.parse(stored);
+    } else {
+        leaderboard = [];
+    }
+    // Sort by score (descending)
+    leaderboard.sort((a, b) => b.score - a.score);
+    // Keep only top 10
+    leaderboard = leaderboard.slice(0, 10);
+}
+
+// Save leaderboard to localStorage
+function saveLeaderboard() {
+    localStorage.setItem('fruitNinjaLeaderboard', JSON.stringify(leaderboard));
+}
+
+// Add score to leaderboard
+function addToLeaderboard(name, score) {
+    leaderboard.push({ name: name || 'Anonymous', score: score, date: new Date().toISOString() });
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard = leaderboard.slice(0, 10); // Keep top 10
+    saveLeaderboard();
+}
+
+// Show name input screen
+function showNameInputScreen() {
+    ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
+    
+    // Draw score
+    drawStyledScore(score, WIDTH / 2, HEIGHT / 2 - 100, true, true);
+    
+    // Draw input prompt
+    drawStyledText("Enter your name:", 32, WIDTH / 2, HEIGHT / 2 + 20, '#00FFFF', 'center');
+    
+    // Draw input box
+    const inputWidth = 400;
+    const inputHeight = 60;
+    const inputX = WIDTH / 2 - inputWidth / 2;
+    const inputY = HEIGHT / 2 + 80;
+    
+    // Draw input background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';
+    drawRoundedRect(inputX, inputY, inputWidth, inputHeight, 10);
+    ctx.fill();
+    
+    // Draw border
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00FFFF';
+    drawRoundedRect(inputX, inputY, inputWidth, inputHeight, 10);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Draw input text
+    const displayText = currentNameInput || "Type your name...";
+    ctx.fillStyle = currentNameInput ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(displayText, inputX + 15, inputY + inputHeight / 2);
+    
+    // Draw cursor
+    if (Date.now() % 1000 < 500) {
+        const textWidth = ctx.measureText(currentNameInput || "").width;
+        ctx.fillStyle = '#00FFFF';
+        ctx.fillRect(inputX + 15 + textWidth, inputY + 15, 2, 30);
+    }
+    
+    // Draw instruction
+    drawStyledText("Press Enter to submit", 20, WIDTH / 2, HEIGHT / 2 + 170, '#FFFFFF', 'center');
+}
+
+// Show leaderboard screen
+function showLeaderboardScreen() {
+    ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
+    
+    // Draw title
+    drawStyledText("LEADERBOARD", 48, WIDTH / 2, 80, '#00FFFF', 'center');
+    
+    // Draw leaderboard panel
+    const panelWidth = Math.min(600, WIDTH - 40);
+    const panelHeight = Math.min(500, HEIGHT - 200);
+    const panelX = WIDTH / 2 - panelWidth / 2;
+    const panelY = 150;
+    
+    // Draw panel background
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 15);
+    ctx.fill();
+    
+    // Draw border
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00FFFF';
+    drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 15);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Draw header
+    ctx.fillStyle = '#00FFFF';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText("Rank", panelX + 20, panelY + 30);
+    ctx.fillText("Name", panelX + 100, panelY + 30);
+    ctx.textAlign = 'right';
+    ctx.fillText("Score", panelX + panelWidth - 20, panelY + 30);
+    
+    // Draw divider
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(panelX + 20, panelY + 50);
+    ctx.lineTo(panelX + panelWidth - 20, panelY + 50);
+    ctx.stroke();
+    
+    // Draw entries
+    const entryHeight = 40;
+    const startY = panelY + 70;
+    const maxEntries = Math.min(leaderboard.length, Math.floor((panelHeight - 70) / entryHeight));
+    
+    for (let i = 0; i < maxEntries; i++) {
+        const entry = leaderboard[i];
+        const y = startY + i * entryHeight;
+        
+        // Highlight current player's entry
+        if (entry.name === playerName && entry.score === score) {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            drawRoundedRect(panelX + 10, y - 15, panelWidth - 20, entryHeight - 5, 5);
+            ctx.fill();
+        }
+        
+        // Rank
+        ctx.fillStyle = i < 3 ? '#FFD700' : '#FFFFFF';
+        ctx.font = `bold ${i < 3 ? '22' : '20'}px Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${i + 1}.`, panelX + 20, y);
+        
+        // Name
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '20px Arial';
+        const displayName = entry.name.length > 20 ? entry.name.substring(0, 17) + '...' : entry.name;
+        ctx.fillText(displayName, panelX + 100, y);
+        
+        // Score
+        ctx.fillStyle = '#00FFFF';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText(entry.score.toString(), panelX + panelWidth - 20, y);
+    }
+    
+    // Draw instruction
+    drawStyledText("Press Enter or Click to play again", 24, WIDTH / 2, HEIGHT - 50, '#FFFFFF', 'center');
+}
+
 // Show game over screen
 function showGameOverScreen() {
     ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
     
     if (!gameOver) {
-        drawText("Score : " + score, 35, WIDTH / 2, HEIGHT / 2);
+        // Draw styled score in center (large version)
+        drawStyledScore(score, WIDTH / 2, HEIGHT / 2, true, true);
     }
     
     drawText("Press Enter or Click to begin!", 35, WIDTH / 2, HEIGHT * 3 / 4);
@@ -970,7 +1521,20 @@ canvas.addEventListener('touchend', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && gameState === 'menu') {
+    if (gameState === 'nameinput') {
+        if (e.key === 'Enter') {
+            playerName = currentNameInput.trim() || 'Anonymous';
+            addToLeaderboard(playerName, score);
+            gameState = 'leaderboard';
+        } else if (e.key === 'Backspace') {
+            currentNameInput = currentNameInput.slice(0, -1);
+        } else if (e.key.length === 1 && currentNameInput.length < 20) {
+            // Only allow alphanumeric and spaces
+            if (/^[a-zA-Z0-9 ]$/.test(e.key)) {
+                currentNameInput += e.key;
+            }
+        }
+    } else if (e.key === 'Enter' && gameState === 'menu') {
         gameState = 'playing';
         gameOver = false;
         playerLives = 3;
@@ -981,7 +1545,12 @@ document.addEventListener('keydown', (e) => {
         startTime = Date.now();
         currentTime = 0;
         mouseTrail = [];
+        heartPopAnimations = [];
         initializeFruits();
+    } else if (e.key === 'Enter' && gameState === 'leaderboard') {
+        gameState = 'menu';
+        playerName = "";
+        score = 0;
     }
 });
 
@@ -1044,6 +1613,7 @@ function handleClick(x, y) {
         startTime = Date.now();
         currentTime = 0;
         mouseTrail = [];
+        heartPopAnimations = [];
         initializeFruits();
     } else if (gameState === 'playing') {
         // Handle fruit slicing - check both point collision and trail collision
@@ -1063,16 +1633,25 @@ function handleClick(x, y) {
                 
                 if (hit) {
                     if (key === 'bomb') {
+                        // Trigger heart pop animation for the lost life
+                        const heartIndex = playerLives - 1; // Index of the heart that will be lost
+                        if (heartIndex >= 0 && heartIndex < 3) {
+                            const heartX = WIDTH - 160 + 45 * heartIndex;
+                            const heartY = 20;
+                            heartPopAnimations.push({
+                                heartIndex: heartIndex,
+                                progress: 0,
+                                particles: createHeartPopParticles(heartX + 20, heartY + 20)
+                            });
+                        }
+                        
                         playerLives--;
                         
                         if (playerLives === 0) {
-                            hideCrossLives(WIDTH - 110, 15, 3);
-                            gameState = 'gameover';
+                            gameState = 'nameinput';
                             gameOver = true;
-                        } else if (playerLives === 1) {
-                            hideCrossLives(WIDTH - 110, 15, 2);
-                        } else if (playerLives === 2) {
-                            hideCrossLives(WIDTH - 110, 15, 1);
+                            currentNameInput = "";
+                            loadLeaderboard();
                         }
                         
                         value.img = assets.explosion;
@@ -1086,6 +1665,15 @@ function handleClick(x, y) {
                 }
             }
         }
+    } else if (gameState === 'nameinput') {
+        // Handle name input clicks (submit on any click)
+        playerName = currentNameInput.trim() || 'Anonymous';
+        addToLeaderboard(playerName, score);
+        gameState = 'leaderboard';
+    } else if (gameState === 'leaderboard') {
+        gameState = 'menu';
+        playerName = "";
+        score = 0;
     } else if (gameState === 'gameover') {
         gameState = 'menu';
     }
@@ -1147,18 +1735,20 @@ function gameLoop() {
         
         // Check if time is up
         if (currentTime >= gameDuration) {
-            gameState = 'gameover';
+            gameState = 'nameinput';
             gameOver = true;
+            currentNameInput = "";
+            loadLeaderboard();
         }
         
-        // Update timer display
-        updateTimerDisplay();
+        // Calculate remaining time
+        const remainingTime = Math.max(0, gameDuration - currentTime);
         
-        // Draw score
-        drawText('Score : ' + score, 42, 0, 20, WHITE, 'left');
+        // Draw combined score and timer display
+        drawScoreAndTimer(score, remainingTime, 20, 60, false, false);
         
         // Draw lives
-        drawLives(WIDTH - 110, 5, playerLives);
+        drawLives(WIDTH - 160, 20, playerLives);
         
         // Calculate player accuracy and adjust difficulty
         const playerAccuracy = (score + 1) / (score + 2);
@@ -1237,6 +1827,12 @@ function gameLoop() {
                 currentFact = null;
             }
         }
+    } else if (gameState === 'nameinput') {
+        canvas.style.cursor = 'text';
+        showNameInputScreen();
+    } else if (gameState === 'leaderboard') {
+        canvas.style.cursor = 'pointer';
+        showLeaderboardScreen();
     } else if (gameState === 'gameover') {
         canvas.style.cursor = 'default';
         showGameOverScreen();
@@ -1249,6 +1845,7 @@ function gameLoop() {
 async function init() {
     const loaded = await loadAssets();
     if (loaded) {
+        loadLeaderboard();
         initializeFruits();
         gameLoop();
     }
